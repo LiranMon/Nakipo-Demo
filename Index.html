@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nakipo – Demo</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  body{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#f7f7f8;color:#111}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:12px 16px}
+  h1{font-size:18px;margin:0} main{padding:16px}
+  .card{background:#fff;border:1px solid #eee;border-radius:10px;padding:14px;margin:10px 0}
+  .row{display:flex;gap:8px;align-items:center}
+  input,select,button,textarea{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #ddd;width:100%}
+  button{background:#111;color:#fff;border:none}.hidden{display:none}.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#efefef;font-size:12px}
+</style></head><body>
+<header><h1>Nakipo – Demo</h1></header><main>
+<section id="auth"><div class="card"><h3>כניסה / הרשמה</h3>
+  <div class="row"><input id="email" placeholder="Email" value="customer1@nakipo.local"></div>
+  <div class="row"><input id="password" placeholder="Password" type="password" value="Customer123!"></div>
+  <div class="row"><label>Role:</label><select id="role"><option value="customer">Customer</option><option value="cleaner">Cleaner</option><option value="admin">Admin</option></select></div>
+  <div class="row"><button onclick="register()">Register</button><button onclick="login()">Login</button></div>
+  <p id="authMsg"></p>
+</div></section>
+
+<section id="dash" class="hidden">
+  <div class="card"><div class="row" style="justify-content:space-between">
+    <div>מחובר כ־ <b id="uemail"></b> <span class="pill" id="urole"></span></div>
+    <button onclick="logout()">Logout</button>
+  </div></div>
+
+  <div class="card"><h3>שירותים</h3><ul id="services"></ul>
+    <div id="adminCreateService" class="hidden">
+      <div class="row"><input id="svcName" placeholder="Service name"></div>
+      <div class="row"><input id="svcPrice" placeholder="Base price (₪)" type="number"></div>
+      <div class="row"><button onclick="createService()">Create Service</button></div>
+    </div>
+  </div>
+
+  <div id="customerPanel" class="hidden">
+    <div class="card"><h3>פתיחת הזמנה</h3>
+      <div class="row"><select id="jobService"></select></div>
+      <div class="row"><input id="jobDate" type="datetime-local"></div>
+      <div class="row"><textarea id="jobNotes" placeholder="Notes"></textarea></div>
+      <div class="row"><button onclick="createJob()">Post Job</button></div>
+    </div>
+    <div class="card"><h3>ההזמנות שלי</h3><ul id="myJobs"></ul></div>
+  </div>
+
+  <div id="cleanerPanel" class="hidden">
+    <div class="card"><h3>הזמנות פתוחות</h3><ul id="openJobs"></ul></div>
+  </div>
+
+  <div id="adminPanel" class="hidden">
+    <div class="card"><h3>כל ההזמנות</h3><ul id="allJobs"></ul></div>
+  </div>
+</section>
+</main>
+
+<script>
+const db={users:JSON.parse(localStorage.getItem('users')||'[]'),services:JSON.parse(localStorage.getItem('services')||'[]'),jobs:JSON.parse(localStorage.getItem('jobs')||'[]')};
+if(!db.services.length){db.services=[{id:'svc-1',name:'Standard Cleaning',basePrice:150},{id:'svc-2',name:'Deep Cleaning',basePrice:300},{id:'svc-3',name:'Move-in/out',basePrice:400}];persist();}
+function persist(){localStorage.setItem('users',JSON.stringify(db.users));localStorage.setItem('services',JSON.stringify(db.services));localStorage.setItem('jobs',JSON.stringify(db.jobs));}
+let session=JSON.parse(localStorage.getItem('session')||'null');
+function register(){const e=document.getElementById('email').value.trim();const p=document.getElementById('password').value;const r=document.getElementById('role').value;if(db.users.find(u=>u.email===e))return msg('Email already exists');const u={id:Date.now().toString(),email:e,password:p,role:r};db.users.push(u);persist();session={user:u};localStorage.setItem('session',JSON.stringify(session));msg('Registered ✔');showDash();}
+function login(){const e=document.getElementById('email').value.trim();const p=document.getElementById('password').value;const u=db.users.find(u=>u.email===e&&u.password===p);if(!u)return msg('Invalid credentials');session={user:u};localStorage.setItem('session',JSON.stringify(session));msg('Logged in ✔');showDash();}
+function logout(){session=null;localStorage.removeItem('session');document.getElementById('dash').classList.add('hidden');document.getElementById('auth').classList.remove('hidden');}
+function msg(t){document.getElementById('authMsg').textContent=t;}
+function showDash(){if(!session)return;document.getElementById('auth').classList.add('hidden');document.getElementById('dash').classList.remove('hidden');document.getElementById('uemail').textContent=session.user.email;document.getElementById('urole').textContent=session.user.role;
+  const ul=document.getElementById('services');ul.innerHTML='';db.services.forEach(s=>{const li=document.createElement('li');li.textContent=`${s.name} – ₪${s.basePrice}`;ul.appendChild(li);});
+  const sel=document.getElementById('jobService');sel.innerHTML='';db.services.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=`${s.name} – ₪${s.basePrice}`;sel.appendChild(o);});
+  document.getElementById('customerPanel').classList.toggle('hidden',session.user.role!=='customer');
+  document.getElementById('cleanerPanel').classList.toggle('hidden',session.user.role!=='cleaner');
+  document.getElementById('adminPanel').classList.toggle('hidden',session.user.role!=='admin');
+  document.getElementById('adminCreateService').classList.toggle('hidden',session.user.role!=='admin');
+  renderJobs();
+}
+function createService(){const n=document.getElementById('svcName').value.trim();const pr=parseInt(document.getElementById('svcPrice').value,10)||0;if(!n||pr<=0)return alert('Fill name and price');db.services.push({id:'svc-'+Date.now(),name:n,basePrice:pr});persist();showDash();}
+function createJob(){const s=document.getElementById('jobService').value;const d=document.getElementById('jobDate').value;const notes=document.getElementById('jobNotes').value;if(!s||!d)return alert('בחר שירות ותאריך');db.jobs.push({id:'job-'+Date.now(),owner:session.user.email,serviceId:s,date:d,notes:notes,status:'open'});persist();renderJobs();alert('הזמנה נפתחה');}
+function renderJobs(){const my=document.getElementById('myJobs');my.innerHTML='';db.jobs.filter(j=>j.owner===session?.user?.email).forEach(j=>{const li=document.createElement('li');const svc=db.services.find(s=>s.id===j.serviceId);li.innerHTML=`<b>${svc?.name||'Service'}</b> • ${new Date(j.date).toLocaleString()} • <span class='pill'>${j.status}</span><br>${j.notes||''}`;my.appendChild(li);});
+  const open=document.getElementById('openJobs');open.innerHTML='';db.jobs.filter(j=>j.status==='open').forEach(j=>{const li=document.createElement('li');const svc=db.services.find(s=>s.id===j.serviceId);const btn=document.createElement('button');btn.textContent='Accept Job';btn.onclick=()=>{j.status='booked';j.cleaner=session.user.email;persist();renderJobs();alert('השיבוץ נקלט');};li.innerHTML=`<b>${svc?.name||'Service'}</b> • ${new Date(j.date).toLocaleString()} • לקוח: ${j.owner}`;li.appendChild(document.createElement('br'));li.appendChild(btn);open.appendChild(li);});
+  const all=document.getElementById('allJobs');all.innerHTML='';db.jobs.forEach(j=>{const li=document.createElement('li');const svc=db.services.find(s=>s.id===j.serviceId);li.innerHTML=`<b>${svc?.name||'Service'}</b> • ${new Date(j.date).toLocaleString()} • לקוח: ${j.owner} • סטטוס: <span class='pill'>${j.status}</span>`;all.appendChild(li);});
+}
+if(session)showDash();
+</script>
+</body></html>
